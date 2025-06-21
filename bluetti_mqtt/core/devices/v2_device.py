@@ -47,6 +47,20 @@ class ProtocolAddress(Enum):
     NODE_INFO = 21000
     COMM_DATA_OTHER = 40000
 
+@unique
+class CtrlStatusMask(Enum):
+    POWER_ENABLE       = 1 << 0
+    AC_ENABLE          = 1 << 1
+    DC_ENABLE          = 1 << 2
+    INV_ENABLE         = 1 << 3
+    GRID_ENABLE        = 1 << 4
+    PV_ENABLE          = 1 << 5
+    FEEDBACK_ENABLE    = 1 << 6
+    METER_ENABLE       = 1 << 7
+    LED_ENABLE         = 1 << 8
+    ECO_ENABLE         = 1 << 9
+    SUPER_POWER_ENABLE = 1 << 10
+
 
 @unique
 class ChargingMode(Enum):
@@ -106,17 +120,7 @@ class V2Device(BluettiDevice):
         # battery_to_ac_load = 1 << 13
         self.struct.add_uint_field("energy_lines", ProtocolAddress.HOME_DATA.value + 46)
 
-        # power_enable       = 1 << 0
-        # ac_enable          = 1 << 1
-        # dc_enable          = 1 << 2
-        # inv_enable         = 1 << 3
-        # grid_enable        = 1 << 4
-        # pv_enable          = 1 << 5
-        # feedback_enable    = 1 << 6
-        # meter_enable       = 1 << 7
-        # led_enable         = 1 << 8
-        # eco_enable         = 1 << 9
-        # super_power_enable = 1 << 10
+        # See CtrlStatusMask
         self.struct.add_uint_field("ctrl_status", ProtocolAddress.HOME_DATA.value + 48)
 
         self.struct.add_uint8_field("grid_parallel_soc", ProtocolAddress.HOME_DATA.value + 51)
@@ -260,3 +264,12 @@ class V2Device(BluettiDevice):
         if len(switches) != 2:
             raise RuntimeError("We only expect two values in this 'range'")
         return [switches]
+
+    def parse(self, address: int, data: bytes) -> dict:
+        """Insert extra virtual fields, like bitfields that need to be unpacked
+        """
+        ret = self.struct.parse(address, data)
+        if ctrl_status := ret.get("ctrl_status"):
+            ret["ac_output_on"] = ctrl_status & CtrlStatusMask.AC_ENABLE.value
+            ret["dc_output_on"] = ctrl_status & CtrlStatusMask.DC_ENABLE.value
+        return ret
