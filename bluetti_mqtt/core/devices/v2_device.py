@@ -16,6 +16,8 @@ class ProtocolAddress(Enum):
     INV_LOAD_INFO = 1400
     INV_INVERTER_INFO = 1500
     INV_BASE_SETTINGS_INFO = 2000
+    AC_SWITCH = 2011 # Writable, 1 = on, 0 = off
+    DC_SWITCH = 2012 # Writable, 1 = on, 0 = off
     INV_ADVANCED_SETTINGS_INFO = 2200
     CERT_SETTINGS_INFO = 2400
     MICRO_INV_ADV_SETTINGS = 2500
@@ -56,6 +58,11 @@ class V2Device(BluettiDevice):
     def __init__(self, address: str, sn: str, type: str):
         super().__init__(address, type, sn)
         self.struct = DeviceStruct(chunk_size=1)
+
+        ## Setters
+        # See ctrl_status to read the current value of these two (it's a bitfield)
+        self.struct.add_bool_field("ac_switch", ProtocolAddress.AC_SWITCH.value)
+        self.struct.add_bool_field("dc_switch", ProtocolAddress.DC_SWITCH.value)
 
         ## BaseConfig
         self.struct.add_uint8_field("cfg_specs", ProtocolAddress.BASE_CONFIG.value + 0)
@@ -177,6 +184,8 @@ class V2Device(BluettiDevice):
         self.struct.add_decimal_field("pack_max_dsg_current", ProtocolAddress.PACK_MAIN_INFO.value + 24, 1)
 
         mqtt_name_map = {
+            'ac_switch': 'ac_output_on',
+            'dc_switch': 'dc_output_on',
             'total_pv_power': 'dc_input_power',
             'total_grid_power': 'ac_input_power',
             'total_ac_power': 'ac_output_power',
@@ -244,3 +253,10 @@ class V2Device(BluettiDevice):
             ReadHoldingRegisters(ProtocolAddress.INV_LOAD_INFO.value, 48),
             ReadHoldingRegisters(ProtocolAddress.PACK_MAIN_INFO.value, 31),
         ]
+
+    @property
+    def writable_ranges(self) -> List[range]:
+        switches = range(ProtocolAddress.AC_SWITCH.value, ProtocolAddress.DC_SWITCH.value + 1)
+        if len(switches) != 2:
+            raise RuntimeError("We only expect two values in this 'range'")
+        return [switches]
