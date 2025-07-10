@@ -6,6 +6,7 @@ import signal
 from typing import List
 import warnings
 import sys
+
 from bluetti_mqtt.bluetooth import scan_devices
 from bluetti_mqtt.bus import EventBus
 from bluetti_mqtt.device_handler import DeviceHandler
@@ -19,39 +20,47 @@ class CommandLineHandler:
     def execute(self):
         parser = argparse.ArgumentParser(
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            description='Scans for Bluetti devices and logs information')
+            description='Scans for Bluetti devices and logs information'
+        )
         parser.add_argument(
             '--scan',
             action='store_true',
-            help='Scans for devices and prints out addresses')
+            help='Scans for devices and prints out addresses'
+        )
         parser.add_argument(
             '--broker',
             metavar='HOST',
             dest='hostname',
-            help='The MQTT broker host to connect to')
+            help='The MQTT broker host to connect to'
+        )
         parser.add_argument(
             '--port',
             default=1883,
             type=int,
-            help='The MQTT broker port to connect to - defaults to %(default)s')
+            help='The MQTT broker port to connect to - defaults to %(default)s'
+        )
         parser.add_argument(
             '--username',
             type=str,
-            help='The optional MQTT broker username')
+            help='The optional MQTT broker username'
+        )
         parser.add_argument(
             '--password',
             type=str,
-            help='The optional MQTT broker password')
+            help='The optional MQTT broker password'
+        )
         parser.add_argument(
             '--interval',
             default=5,
             type=int,
-            help='The polling interval - set to 0 to poll as fast as possible')
+            help='The polling interval - set to 0 to poll as fast as possible'
+        )
         parser.add_argument(
             '--ha-config',
             default='normal',
             choices=['normal', 'none', 'advanced'],
-            help='What fields to configure in Home Assistant - defaults to most fields ("normal")')
+            help='What fields to configure in Home Assistant - defaults to most fields ("normal")'
+        )
         parser.add_argument(
             '-v',
             action='store_true',
@@ -61,14 +70,14 @@ class CommandLineHandler:
             'addresses',
             metavar='ADDRESS',
             nargs='*',
-            help='The device MAC(s) to connect to')
+            help='The device MAC(s) to connect to'
+        )
 
-        # The default event loop on windows doesn't support add_reader, which
-        # is required by asyncio-mqtt
+        # Windows loop fix for asyncio-mqtt
         if sys.platform == 'win32':
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-        args = parser.parse_args()
+        args = parser.parse_args(self.argv[1:])
         setup_logging(logging.DEBUG if args.v else logging.INFO)
 
         if args.scan:
@@ -101,7 +110,6 @@ class CommandLineHandler:
         loop = asyncio.get_running_loop()
         bus = EventBus()
 
-        # Set up strong reference for tasks
         self.background_tasks = set()
 
         # Start event bus
@@ -122,7 +130,7 @@ class CommandLineHandler:
         self.background_tasks.add(mqtt_task)
         mqtt_task.add_done_callback(self.background_tasks.discard)
 
-        # Start bluetooth handler (manages connections)
+        # Start Bluetooth handler
         addresses: List[str] = list(set(args.addresses))
         handler = DeviceHandler(addresses, args.interval, bus)
         bluetooth_task = loop.create_task(handler.run())
@@ -158,7 +166,8 @@ def setup_logging(level):
         level=level
     )
 
-def main(argv):
+
+def main(argv=None):
     cli = CommandLineHandler(argv)
     cli.execute()
 
